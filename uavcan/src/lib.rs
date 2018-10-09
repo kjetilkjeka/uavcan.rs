@@ -48,6 +48,7 @@ pub use uavcan_derive::*;
 
 pub mod transfer;
 pub mod types;
+mod serialize;
 mod crc;
 mod deserializer;
 mod frame_assembler;
@@ -60,6 +61,7 @@ use bit_field::BitField;
 
 use transfer::TransferFrameID;
 
+pub use serialize::Cursor;
 
 pub use node::NodeConfig;
 pub use node::NodeID;
@@ -185,8 +187,8 @@ pub trait Serializable {
     /// ```
     const FLATTENED_FIELDS_NUMBER: usize;
 
-    fn serialize(&self, flattened_field: &mut usize, bit: &mut usize, last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult;
-    fn deserialize(&mut self, flattened_field: &mut usize, bit: &mut usize, last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult;
+    fn serialize(&self, cursor: &mut Cursor, last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult;
+    fn deserialize(&mut self, cursor: &mut Cursor, last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult;
 }
 
 pub trait Struct: Sized + Serializable {

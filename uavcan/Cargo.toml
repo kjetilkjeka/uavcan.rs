@@ -23,7 +23,7 @@ std = ["ux/std", "half/std"]
 
 [dependencies]
 bit_field = "0.8.0"
-uavcan-derive = "0.1.0-preview0"
+uavcan-derive = {path = "../uavcan-derive"}
 embedded_types = "0.3.0"
 
 [dependencies.half]

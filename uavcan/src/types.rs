@@ -16,6 +16,10 @@ use lib::core::ops::{
 
 use bit_field::BitField;
 
+use {
+    Cursor,
+};
+
 use serializer::{
     SerializationResult,
     SerializationBuffer,
@@ -63,43 +67,43 @@ macro_rules! impl_array{
             const BIT_LENGTH_MIN: usize = $size * T::BIT_LENGTH_MIN;
             const FLATTENED_FIELDS_NUMBER: usize = $size * T::FLATTENED_FIELDS_NUMBER;
             
-            fn serialize(&self, flattened_field: &mut usize, bit: &mut usize, _last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult {
-                while *flattened_field < Self::FLATTENED_FIELDS_NUMBER {
-                    let element = *flattened_field  / T::FLATTENED_FIELDS_NUMBER;
-                    let mut element_field = *flattened_field % T::FLATTENED_FIELDS_NUMBER;
-                    match self[element].serialize(&mut element_field, bit, false, buffer) {
+            fn serialize(&self, cursor: &mut Cursor, _last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult {
+                while cursor.field < Self::FLATTENED_FIELDS_NUMBER {
+                    let element = cursor.field  / T::FLATTENED_FIELDS_NUMBER;
+                    cursor.field -= element*T::FLATTENED_FIELDS_NUMBER;
+                    match self[element].serialize(cursor, false, buffer) {
                         SerializationResult::Finished => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + element_field;
+                            cursor.field += element*T::FLATTENED_FIELDS_NUMBER;
                         },
                         SerializationResult::BufferFull => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + element_field;
+                            cursor.field += element*T::FLATTENED_FIELDS_NUMBER;
                             return SerializationResult::BufferFull;
                         },
                     }
                 }
                 
-                *flattened_field = Self::FLATTENED_FIELDS_NUMBER;
-                *bit = 0;
+                cursor.field = Self::FLATTENED_FIELDS_NUMBER;
+                cursor.bit = 0;
                 SerializationResult::Finished
             }
             
-            fn deserialize(&mut self, flattened_field: &mut usize, bit: &mut usize, _last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult {
-                while *flattened_field < Self::FLATTENED_FIELDS_NUMBER {
-                    let element = *flattened_field / T::FLATTENED_FIELDS_NUMBER;
-                    let mut element_field = *flattened_field % T::FLATTENED_FIELDS_NUMBER;
-                    match self[element].deserialize(&mut element_field, bit, false, buffer) {
+            fn deserialize(&mut self, cursor: &mut Cursor, _last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult {
+                while cursor.field < Self::FLATTENED_FIELDS_NUMBER {
+                    let element = cursor.field / T::FLATTENED_FIELDS_NUMBER;
+                    cursor.field -= element*T::FLATTENED_FIELDS_NUMBER;
+                    match self[element].deserialize(cursor, false, buffer) {
                         DeserializationResult::Finished => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + element_field;
+                            cursor.field += element*T::FLATTENED_FIELDS_NUMBER;
                         },
                         DeserializationResult::BufferInsufficient => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + element_field;
+                            cursor.field += element*T::FLATTENED_FIELDS_NUMBER;
                             return DeserializationResult::BufferInsufficient;
                         },
                     }
                 }
                 
-                *flattened_field = Self::FLATTENED_FIELDS_NUMBER;
-                *bit = 0;
+                cursor.field = Self::FLATTENED_FIELDS_NUMBER;
+                cursor.bit = 0;
                 DeserializationResult::Finished
             }
         }
@@ -187,7 +191,7 @@ macro_rules! impl_array{
             const BIT_LENGTH_MIN: usize = $length_bits;
             const FLATTENED_FIELDS_NUMBER: usize = $size * T::FLATTENED_FIELDS_NUMBER + 1;
             
-            fn serialize(&self, flattened_field: &mut usize, bit: &mut usize, last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult {
+            fn serialize(&self, cursor: &mut Cursor, last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult {
 
                 let buffer_bits_remaining = buffer.bits_remaining();
 
@@ -196,92 +200,92 @@ macro_rules! impl_array{
                 }                
                 
                 // check for tail optimization
-                if T::BIT_LENGTH_MIN >= 8 && last_field && *flattened_field == 0 {
-                    *flattened_field = 1;
+                if T::BIT_LENGTH_MIN >= 8 && last_field && cursor.field == 0 {
+                    cursor.field = 1;
                 }
                 
-                if *flattened_field == 0 {
+                if cursor.field == 0 {
                     
-                    let type_bits_remaining = Self::LENGTH_BITS - *bit;
+                    let type_bits_remaining = Self::LENGTH_BITS - cursor.bit;
                     
                     if buffer_bits_remaining >= type_bits_remaining {
-                        buffer.push_bits(type_bits_remaining, self.current_length.get_bits((*bit as u8)..(Self::LENGTH_BITS as u8)) as u64);
-                        *flattened_field = 1;
-                        *bit = 0;
+                        buffer.push_bits(type_bits_remaining, self.current_length.get_bits((cursor.bit as u8)..(Self::LENGTH_BITS as u8)) as u64);
+                        cursor.field = 1;
+                        cursor.bit = 0;
                     } else {
-                        buffer.push_bits(buffer_bits_remaining, self.current_length.get_bits((*bit as u8)..(*bit + buffer_bits_remaining) as u8) as u64);
-                        *bit += buffer_bits_remaining;
+                        buffer.push_bits(buffer_bits_remaining, self.current_length.get_bits((cursor.bit as u8)..(cursor.bit + buffer_bits_remaining) as u8) as u64);
+                        cursor.bit += buffer_bits_remaining;
                         return SerializationResult::BufferFull
                     }
                 }
 
-                while *flattened_field - 1 < self.current_length*T::FLATTENED_FIELDS_NUMBER {
-                    let element = (*flattened_field - 1) / T::FLATTENED_FIELDS_NUMBER;
-                    let mut element_field = (*flattened_field - 1) % T::FLATTENED_FIELDS_NUMBER;
-                    match self[element].serialize(&mut element_field, bit, false, buffer) {
+                while cursor.field - 1 < self.current_length*T::FLATTENED_FIELDS_NUMBER {
+                    let element = (cursor.field - 1) / T::FLATTENED_FIELDS_NUMBER;
+                    cursor.field -= 1 + element*T::FLATTENED_FIELDS_NUMBER;
+                    match self[element].serialize(cursor, false, buffer) {
                         SerializationResult::Finished => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + 1 + element_field;
+                            cursor.field += 1 + element*T::FLATTENED_FIELDS_NUMBER;
                         },
                         SerializationResult::BufferFull => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + 1 + element_field;
+                            cursor.field += 1 + element*T::FLATTENED_FIELDS_NUMBER;
                             return SerializationResult::BufferFull;
                         },
                     }
                 }
 
-                *flattened_field = Self::FLATTENED_FIELDS_NUMBER;
-                *bit = 0;
+                cursor.field = Self::FLATTENED_FIELDS_NUMBER;
+                cursor.bit = 0;
                 SerializationResult::Finished
             }
 
-            fn deserialize(&mut self, flattened_field: &mut usize, bit: &mut usize, last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult {
+            fn deserialize(&mut self, cursor: &mut Cursor, last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult {
 
                 // check for tail optimization
                 let tail_array_optimization = last_field && (T::BIT_LENGTH_MIN >= 8);
 
-                if tail_array_optimization && *flattened_field == 0 {
-                    *flattened_field = 1;
+                if tail_array_optimization && cursor.field == 0 {
+                    cursor.field = 1;
                 }
                 
                 // deserialize length
-                if *flattened_field == 0 {
+                if cursor.field == 0 {
                     
                     let buffer_len = buffer.bit_length();
-                    if buffer_len + *bit < Self::LENGTH_BITS {
-                        self.deserialized_length.set_bits(*bit as u8..(*bit+buffer_len) as u8, buffer.pop_bits(buffer_len) as usize);
-                        *bit += buffer_len;
+                    if buffer_len + cursor.bit < Self::LENGTH_BITS {
+                        self.deserialized_length.set_bits(cursor.bit as u8..(cursor.bit+buffer_len) as u8, buffer.pop_bits(buffer_len) as usize);
+                        cursor.bit += buffer_len;
                         return DeserializationResult::BufferInsufficient
                     } else {
-                        self.deserialized_length.set_bits(*bit as u8..Self::LENGTH_BITS as u8, buffer.pop_bits(Self::LENGTH_BITS-*bit) as usize);
-                        *flattened_field = 1;
-                        *bit = 0;
+                        self.deserialized_length.set_bits(cursor.bit as u8..Self::LENGTH_BITS as u8, buffer.pop_bits(Self::LENGTH_BITS-cursor.bit) as usize);
+                        cursor.field = 1;
+                        cursor.bit = 0;
                     }
                 }
                 
-                while *flattened_field < Self::FLATTENED_FIELDS_NUMBER {
-                    let element = (*flattened_field - 1) / T::FLATTENED_FIELDS_NUMBER;
-                    let mut element_field = (*flattened_field - 1) % T::FLATTENED_FIELDS_NUMBER;
-                    match self.array[element].deserialize(&mut element_field, bit, false, buffer) {
+                while cursor.field < Self::FLATTENED_FIELDS_NUMBER {
+                    let element = (cursor.field - 1) / T::FLATTENED_FIELDS_NUMBER;
+                    cursor.field -= 1 + element*T::FLATTENED_FIELDS_NUMBER;
+                    match self.array[element].deserialize(cursor, false, buffer) {
                         DeserializationResult::Finished => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + 1 + element_field;
+                            cursor.field += 1 + element*T::FLATTENED_FIELDS_NUMBER;
                             self.current_length = element+1;
                             if !tail_array_optimization && self.current_length == self.deserialized_length {
-                                *flattened_field = Self::FLATTENED_FIELDS_NUMBER;
-                                *bit = 0;
+                                cursor.field = Self::FLATTENED_FIELDS_NUMBER;
+                                cursor.bit = 0;
                                 return DeserializationResult::Finished;
                             }
                         },
                         DeserializationResult::BufferInsufficient => {
-                            *flattened_field = element*T::FLATTENED_FIELDS_NUMBER + 1 + element_field;
+                            cursor.field += 1 + element*T::FLATTENED_FIELDS_NUMBER;
                             self.current_length = element;
                             return DeserializationResult::BufferInsufficient;
                         },
                     }
                 }
                 
-                *flattened_field = Self::FLATTENED_FIELDS_NUMBER;
-                self.current_length = (*flattened_field - 1) / T::FLATTENED_FIELDS_NUMBER;
-                *bit = 0;
+                cursor.field = Self::FLATTENED_FIELDS_NUMBER;
+                self.current_length = (cursor.field - 1) / T::FLATTENED_FIELDS_NUMBER;
+                cursor.bit = 0;
                 DeserializationResult::Finished
             }
             
@@ -476,46 +480,46 @@ macro_rules! impl_serializeable {
 
             const FLATTENED_FIELDS_NUMBER: usize = 1;
             
-            fn serialize(&self, flattened_field: &mut usize, bit: &mut usize, _last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult {
-                assert_eq!(*flattened_field, 0);
-                let type_bits_remaining = $bits - *bit;
+            fn serialize(&self, cursor: &mut Cursor, _last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult {
+                assert_eq!(cursor.field, 0);
+                let type_bits_remaining = $bits - cursor.bit;
                 let buffer_bits_remaining = buffer.bits_remaining();
                 
                 if type_bits_remaining == 0 {
-                    *bit = 0;
-                    *flattened_field = 1;
+                    cursor.bit = 0;
+                    cursor.field = 1;
                     SerializationResult::Finished
                 } else if buffer_bits_remaining == 0 {
                     SerializationResult::BufferFull
                 } else if buffer_bits_remaining >= type_bits_remaining {
-                    buffer.push_bits(type_bits_remaining, PrimitiveType::to_bits(*self) >> *bit);
-                    *bit = 0;
-                    *flattened_field = 1;
+                    buffer.push_bits(type_bits_remaining, PrimitiveType::to_bits(*self) >> cursor.bit);
+                    cursor.bit = 0;
+                    cursor.field = 1;
                     SerializationResult::Finished
                 } else {
-                    buffer.push_bits(buffer_bits_remaining, PrimitiveType::to_bits(*self) >> *bit);
-                    *bit += buffer_bits_remaining;
+                    buffer.push_bits(buffer_bits_remaining, PrimitiveType::to_bits(*self) >> cursor.bit);
+                    cursor.bit += buffer_bits_remaining;
                     SerializationResult::BufferFull
                 }
             }
             
-            fn deserialize(&mut self, flattened_field: &mut usize, bit: &mut usize, _last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult {
-                assert_eq!(*flattened_field, 0);
+            fn deserialize(&mut self, cursor: &mut Cursor, _last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult {
+                assert_eq!(cursor.field, 0);
                 let buffer_len = buffer.bit_length();
-                if buffer_len == 0 && *bit == $bits {
-                    *bit = 0;
-                    *flattened_field = 1;
+                if buffer_len == 0 && cursor.bit == $bits {
+                    cursor.bit = 0;
+                    cursor.field = 1;
                     DeserializationResult::Finished
-                } else if buffer_len == 0 && *bit < $bits {
+                } else if buffer_len == 0 && cursor.bit < $bits {
                     DeserializationResult::BufferInsufficient
-                } else if buffer_len < $bits - *bit {
-                    *self = PrimitiveType::from_bits(PrimitiveType::to_bits(*self) | (buffer.pop_bits(buffer_len) << *bit));
-                    *bit += buffer_len;
+                } else if buffer_len < $bits - cursor.bit {
+                    *self = PrimitiveType::from_bits(PrimitiveType::to_bits(*self) | (buffer.pop_bits(buffer_len) << cursor.bit));
+                    cursor.bit += buffer_len;
                     DeserializationResult::BufferInsufficient
                 } else {
-                    *self = PrimitiveType::from_bits(PrimitiveType::to_bits(*self) | (buffer.pop_bits($bits-*bit) << *bit));
-                    *bit = 0;
-                    *flattened_field = 1;
+                    *self = PrimitiveType::from_bits(PrimitiveType::to_bits(*self) | (buffer.pop_bits($bits-cursor.bit) << cursor.bit));
+                    cursor.bit = 0;
+                    cursor.field = 1;
                     DeserializationResult::Finished
                 }
             }

@@ -3,6 +3,7 @@ use lib::core::mem;
 pub use serializer::SerializationBuffer as DeserializationBuffer;
 
 use {
+    Cursor,
     Struct,
 };
 
@@ -16,8 +17,7 @@ pub enum DeserializationResult {
 
 pub struct Deserializer<T: Struct> {
     structure: T,
-    field_index: usize,
-    bit_index: usize,
+    cursor: Cursor,
 }
 
 impl<T: Struct> Deserializer<T> {
@@ -26,12 +26,12 @@ impl<T: Struct> Deserializer<T> {
         unsafe {
             structure = mem::zeroed();
         };            
-        Deserializer{structure: structure, field_index: 0, bit_index: 0}
+        Deserializer{structure: structure, cursor: Cursor::new()}
     }
 
     pub fn deserialize(&mut self, input: &mut [u8]) -> DeserializationResult {
         let mut buffer = DeserializationBuffer::with_full_buffer(input);
-        self.structure.deserialize(&mut self.field_index, &mut self.bit_index, true, &mut buffer)
+        self.structure.deserialize(&mut self.cursor, true, &mut buffer)
     }
 
     pub fn into_structure(self) -> Result<T, ()> {
