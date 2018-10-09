@@ -187,8 +187,8 @@ pub trait Serializable {
     /// ```
     const FLATTENED_FIELDS_NUMBER: usize;
 
-    fn serialize(&self, cursor: &mut Cursor, last_field: bool, buffer: &mut SerializationBuffer) -> SerializationResult;
-    fn deserialize(&mut self, cursor: &mut Cursor, last_field: bool, buffer: &mut DeserializationBuffer) -> DeserializationResult;
+    fn serialize(&self, cursor: &mut Cursor, buffer: &mut SerializationBuffer) -> SerializationResult;
+    fn deserialize(&mut self, cursor: &mut Cursor, buffer: &mut DeserializationBuffer) -> DeserializationResult;
 }
 
 pub trait Struct: Sized + Serializable {

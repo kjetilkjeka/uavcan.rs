@@ -148,7 +148,7 @@ mod tests {
         struct LogMessage {
             level: LogLevel,
             source: Dynamic<[u8; 31]>,
-            text: Dynamic<[u8; 90]>,
+            text: Dynamic<[u8; 255]>,
         }
 
         impl Message for LogMessage {
@@ -158,7 +158,7 @@ mod tests {
         let uavcan_frame = Frame::from_message(LogMessage{
             level: LogLevel{value: u3::new(0)},
             source: Dynamic::<[u8; 31]>::with_data("test source".as_bytes()),
-            text: Dynamic::<[u8; 90]>::with_data("test text".as_bytes()),
+            text: Dynamic::<[u8; 255]>::with_data("test text".as_bytes()),
         }, 0, NodeID::new(32));
 
         let mut frame_generator = FrameDisassembler::from_uavcan_frame(uavcan_frame, TransferID::new(0));
@@ -189,7 +189,7 @@ mod tests {
             Some(CanFrame{
                 id: TransferFrameID::new(4194080),
                 dlc: 8,
-                data: [b't', b'e', b's', b't', b' ', b't', b'e', TailByte::new(false, false, false, TransferID::new(0)).into()],
+                data: [9, b't', b'e', b's', b't', b' ', b't', TailByte::new(false, false, false, TransferID::new(0)).into()],
             })
         );
         
@@ -197,8 +197,8 @@ mod tests {
             frame_generator.next_transfer_frame(),
             Some(CanFrame{
                 id: TransferFrameID::new(4194080),
-                dlc: 3,
-                data: [b'x', b't', TailByte::new(false, true, true, TransferID::new(0)).into(), 0, 0, 0, 0, 0],
+                dlc: 4,
+                data: [b'e', b'x', b't', TailByte::new(false, true, true, TransferID::new(0)).into(), 0, 0, 0, 0],
             })
         );
 

@@ -31,7 +31,7 @@ impl<T: Struct> Deserializer<T> {
 
     pub fn deserialize(&mut self, input: &mut [u8]) -> DeserializationResult {
         let mut buffer = DeserializationBuffer::with_full_buffer(input);
-        self.structure.deserialize(&mut self.cursor, true, &mut buffer)
+        self.structure.deserialize(&mut self.cursor, &mut buffer)
     }
 
     pub fn into_structure(self) -> Result<T, ()> {
@@ -110,55 +110,26 @@ mod tests {
 
         #[derive(Debug, PartialEq, Clone, UavcanStruct)]
         struct TestMessage {
-            pad: u5,
+            pad1: u5,
             text1: Dynamic<[u8; 7]>,
+            pad2: u4,
             text2: Dynamic<[u8; 8]>,
         }
         
         let mut deserializer: Deserializer<TestMessage> = Deserializer::new();
 
-        deserializer.deserialize(&mut [0u8.set_bits(0..3, 4).get_bits(0..8), b't', b'e', b's', b't', b'l', b'o', b'l']);
+        deserializer.deserialize(&mut [0u8.set_bits(0..3, 4).get_bits(0..8), b't', b'e', b's', b't',  0u8.set_bits(0..4, 3).get_bits(0..8), b'l', b'o', b'l']);
         
         let parsed_message = deserializer.into_structure().unwrap();
 
         assert_eq!(parsed_message,
                    TestMessage{
-                       pad: u5::new(0),
+                       pad1: u5::new(0),
                        text1: Dynamic::<[u8; 7]>::with_data("test".as_bytes()),
+                       pad2: u4::new(0),
                        text2: Dynamic::<[u8; 8]>::with_data("lol".as_bytes()),
                    }
         );
-    }
-
-    #[test]
-    fn tail_array_optimization_struct() {
-        #[derive(Debug, PartialEq, UavcanStruct, Clone)]
-        struct DynamicArrayStruct {
-            value: Dynamic<[u8; 255]>,
-        }
-        
-        #[derive(Debug, PartialEq, UavcanStruct, Clone)]
-        struct TestStruct {
-            t1: DynamicArrayStruct, // this array should not be tail array optimized (should encode length)
-            t2: DynamicArrayStruct, // this array should be tail array optimized (should not encode length)
-        }
-        
-        assert_eq!(DynamicArrayStruct::FLATTENED_FIELDS_NUMBER, 256);
-        assert_eq!(TestStruct::FLATTENED_FIELDS_NUMBER, 512);
-        
-        let dynamic_array_struct = DynamicArrayStruct{value: Dynamic::<[u8; 255]>::with_data(&[4u8, 5u8, 6u8])};
-        
-        let test_struct = TestStruct{
-            t1: dynamic_array_struct.clone(),
-            t2: dynamic_array_struct.clone(),
-        };
-        
-        let mut deserializer: Deserializer<TestStruct> = Deserializer::new();
-        deserializer.deserialize(&mut [3, 4, 5, 6, 4, 5, 6]);
-        let parsed_struct = deserializer.into_structure().unwrap();
-        
-        assert_eq!(parsed_struct, test_struct);                   
-
     }
 
     #[test]
@@ -193,7 +164,7 @@ mod tests {
         
         #[derive(Debug, PartialEq, Clone, UavcanStruct)]
         pub struct ArrayCommand {
-            pub commands: Dynamic<[Command; 15]>,
+            pub commands: Dynamic<[Command; 255]>,
         }
 
         let mut actuator_command = Command {
@@ -203,7 +174,7 @@ mod tests {
         };
         
         let mut actuator_message = ArrayCommand {
-            commands: Dynamic::<[Command; 15]>::new(),
+            commands: Dynamic::<[Command; 255]>::new(),
         };
 
         actuator_message.commands.push(actuator_command.clone());
@@ -212,7 +183,7 @@ mod tests {
         actuator_message.commands.push(actuator_command);
         
         let mut deserializer: Deserializer<ArrayCommand> = Deserializer::new();
-        deserializer.deserialize(&mut [0, 3, f16::from_f32(1.0).as_bits() as u8, (f16::from_f32(1.0).as_bits() >> 8) as u8, 1, 3, (f16::from_f32(1.0).as_bits() as u8), (f16::from_f32(1.0).as_bits() >> 8) as u8]);
+        deserializer.deserialize(&mut [2, 0, 3, f16::from_f32(1.0).as_bits() as u8, (f16::from_f32(1.0).as_bits() >> 8) as u8, 1, 3, (f16::from_f32(1.0).as_bits() as u8), (f16::from_f32(1.0).as_bits() >> 8) as u8]);
         
         assert_eq!(deserializer.into_structure().unwrap(), actuator_message);                   
 

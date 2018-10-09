@@ -146,12 +146,12 @@ impl<T: Struct> Serializer<T> {
     /// When the serialization is finished the return value will 
     /// contain the number of bits that was serialized
     pub fn serialize(&mut self, buffer: &mut SerializationBuffer) -> SerializationResult {
-        self.structure.serialize(&mut self.cursor, true, buffer)
+        self.structure.serialize(&mut self.cursor, buffer)
     }
 
     pub fn peek_serialize(&self, buffer: &mut SerializationBuffer) -> SerializationResult {
         let mut cursor = self.cursor;
-        self.structure.serialize(&mut cursor, true, buffer)
+        self.structure.serialize(&mut cursor, buffer)
     }
 
     pub fn crc(&mut self, data_type_signature: u64) -> u16 {
@@ -248,44 +248,44 @@ mod tests {
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut data);
 
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(uint2.serialize(&mut cursor, false, &mut buffer), SerializationResult::Finished);
+        assert_eq!(uint2.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(buffer.data, [0b01000000, 0, 0, 0]);
 
         buffer.stop_bit_index = 0;
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(uint8.serialize(&mut cursor, false, &mut buffer), SerializationResult::Finished);
+        assert_eq!(uint8.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(buffer.data, [128, 0, 0, 0]);
 
         buffer.stop_bit_index = 0;
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(uint16.serialize(&mut cursor, false, &mut buffer), SerializationResult::Finished);
+        assert_eq!(uint16.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(buffer.data, [1, 1, 0, 0]);
 
-        uint2.serialize(&mut Cursor::new(), false, &mut buffer);
+        uint2.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [1, 1, 0b01000000, 0]);
 
-        uint8.serialize(&mut Cursor::new(), false, &mut buffer);
+        uint8.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [1, 1, 0b01000000, 0b10000000]);
 
         buffer.stop_bit_index = 0;
-        int16.serialize(&mut Cursor::new(), false, &mut buffer);
+        int16.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data[0..2], [0xff, 0xff]);
 
         buffer.stop_bit_index = 0;
         buffer.data[0] = 0;
-        int7.serialize(&mut Cursor::new(), false, &mut buffer);
+        int7.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data[0], (-64i8 as u8) << 1);
 
         buffer.stop_bit_index = 0;
-        float16.serialize(&mut Cursor::new(), false, &mut buffer);
+        float16.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data[0..2], [f16::from_f32(3.141592).as_bits() as u8, (f16::from_f32(3.141592).as_bits() >> 8) as u8]);
 
         buffer.stop_bit_index = 0;
-        float32.serialize(&mut Cursor::new(), false, &mut buffer);
+        float32.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0x00, 0x00, 0x80, 0x3f]);
 
         buffer.stop_bit_index = 0;
-        float64.serialize(&mut Cursor::new(), false, &mut buffer);
+        float64.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0x69, 0x57, 0x14, 0x8b]);
 
 
@@ -301,17 +301,17 @@ mod tests {
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut data);
 
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(a1.serialize(&mut cursor, false, &mut buffer), SerializationResult::Finished);
+        assert_eq!(a1.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(cursor.field, 5);
         assert_eq!(cursor.bit, 0);
         assert_eq!(buffer.data, [0b10001001, 0, 0, 0]);
 
         buffer.stop_bit_index = 0;
-        a2.serialize(&mut Cursor::new(), false, &mut buffer);
+        a2.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0b11001001, 0b00001000, 0, 0]);
 
         buffer.stop_bit_index = 0;
-        a3.serialize(&mut Cursor::new(), false, &mut buffer);
+        a3.serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0b10000001, 0b00000010, 0b00000100, 0b00010000]);
 
     }
@@ -324,21 +324,21 @@ mod tests {
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut data);
 
         let mut cursor = Cursor{field: 1, bit: 0};
-        a.serialize(&mut cursor, false, &mut buffer);
+        a.serialize(&mut cursor, &mut buffer);
         assert_eq!(cursor.field, 2);
         assert_eq!(cursor.bit, 1);
         assert_eq!(buffer.data, [0b00000011]);
         
         buffer.stop_bit_index = 0;
-        a.serialize(&mut cursor, false, &mut buffer);
+        a.serialize(&mut cursor, &mut buffer);
         assert_eq!(buffer.data, [0b00000001]);
 
         buffer.stop_bit_index = 0;
-        a.serialize(&mut cursor, false, &mut buffer);
+        a.serialize(&mut cursor, &mut buffer);
         assert_eq!(buffer.data, [0b00000001]);
 
         buffer.stop_bit_index = 0;
-        a.serialize(&mut cursor, false, &mut buffer);
+        a.serialize(&mut cursor, &mut buffer);
         assert_eq!(buffer.data[0].get_bits((8 - buffer.stop_bit_index as u8)..8), 0b00000000);
 
     }
@@ -462,41 +462,6 @@ mod tests {
 
 
     #[test]
-    fn tail_array_optimization_struct() {
-        #[derive(Debug, PartialEq, Clone, UavcanStruct)]
-        struct DynamicArrayStruct {
-            value: Dynamic<[u8; 255]>,
-        }
-
-        
-        #[derive(Debug, PartialEq, Clone, UavcanStruct)]
-        struct TestStruct {
-            t1: DynamicArrayStruct, // this array should not be tail array optimized (should encode length)
-            t2: DynamicArrayStruct, // this array should be tail array optimized (should not encode length)
-        }
-
-        assert_eq!(DynamicArrayStruct::FLATTENED_FIELDS_NUMBER, 256);
-        assert_eq!(TestStruct::FLATTENED_FIELDS_NUMBER, 512);
-
-        let dynamic_array_struct = DynamicArrayStruct{value: Dynamic::<[u8; 255]>::with_data(&[4u8, 5u8, 6u8])};
-        
-        let test_struct = TestStruct{
-            t1: dynamic_array_struct.clone(),
-            t2: dynamic_array_struct.clone(),
-        };
-
-        
-
-        let mut serializer: Serializer<TestStruct> = Serializer::from_structure(test_struct);
-        let mut array: [u8; 8] = [0; 8];
-        let mut buffer = SerializationBuffer::with_empty_buffer(&mut array);
-
-        serializer.serialize(&mut buffer);
-        assert_eq!(buffer.data, [3, 4, 5, 6, 4, 5, 6, 0]);                   
-
-    }
-
-    #[test]
     fn dynamic_array_of_structs() {
         #[derive(Debug, PartialEq, Clone, UavcanStruct)]
         pub struct Command {
@@ -507,7 +472,7 @@ mod tests {
         
         #[derive(Debug, PartialEq, Clone, UavcanStruct)]
         pub struct ArrayCommand {
-            pub commands: Dynamic<[Command; 15]>,
+            pub commands: Dynamic<[Command; 255]>,
         }
 
         let mut actuator_command = Command {
@@ -517,7 +482,7 @@ mod tests {
         };
         
         let mut actuator_message = ArrayCommand {
-            commands: Dynamic::<[Command; 15]>::new(),
+            commands: Dynamic::<[Command; 255]>::new(),
         };
 
         actuator_message.commands.push(actuator_command.clone());
@@ -527,11 +492,11 @@ mod tests {
         
 
         let mut serializer: Serializer<ArrayCommand> = Serializer::from_structure(actuator_message);
-        let mut array: [u8; 8] = [0; 8];
+        let mut array: [u8; 9] = [0; 9];
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut array);
 
         serializer.serialize(&mut buffer);
-        assert_eq!(buffer.data, [0, 3, f16::from_f32(1.0).as_bits() as u8, (f16::from_f32(1.0).as_bits() >> 8) as u8, 1, 3, (f16::from_f32(1.0).as_bits() as u8), (f16::from_f32(1.0).as_bits() >> 8) as u8]);                   
+        assert_eq!(buffer.data, [2, 0, 3, f16::from_f32(1.0).as_bits() as u8, (f16::from_f32(1.0).as_bits() >> 8) as u8, 1, 3, (f16::from_f32(1.0).as_bits() as u8), (f16::from_f32(1.0).as_bits() >> 8) as u8]);
 
     }
 
