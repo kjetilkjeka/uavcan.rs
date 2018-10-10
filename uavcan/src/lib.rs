@@ -187,8 +187,27 @@ pub trait Serializable {
     /// ```
     const FLATTENED_FIELDS_NUMBER: usize;
 
-    fn serialize(&self, cursor: &mut Cursor, buffer: &mut SerializationBuffer) -> SerializationResult;
-    fn deserialize(&mut self, cursor: &mut Cursor, buffer: &mut DeserializationBuffer) -> DeserializationResult;
+    /// Partially serializes an Uavcan Type
+    ///
+    /// Start serializing from the cursor position until one of the conditions occur:
+    ///  - The whole type has been serialized.
+    ///  - The buffer is full.
+    ///
+    /// The return value will tell whether serialization was completed or buffer was filled.
+    ///
+    /// When this method returns, the cursor will be set to where serialization stopped.
+    fn partial_serialize(&self, cursor: &mut Cursor, buffer: &mut SerializationBuffer) -> SerializationResult;
+
+    /// Partially deserializes an Uavcan Type
+    ///
+    /// Start deserializing from the cursor position until one of the conditions occur:
+    ///  - The whole type has been deserialized.
+    ///  - The buffer is full.
+    ///
+    /// The return value will tell whether serialization was completed or buffer was filled.
+    ///
+    /// When this method returns, the cursor will be set to where deserialization stopped.
+    fn partial_deserialize(&mut self, cursor: &mut Cursor, buffer: &mut DeserializationBuffer) -> DeserializationResult;
 }
 
 pub trait Struct: Sized + Serializable {

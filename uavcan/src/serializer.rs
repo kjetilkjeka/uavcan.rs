@@ -146,12 +146,12 @@ impl<T: Struct> Serializer<T> {
     /// When the serialization is finished the return value will 
     /// contain the number of bits that was serialized
     pub fn serialize(&mut self, buffer: &mut SerializationBuffer) -> SerializationResult {
-        self.structure.serialize(&mut self.cursor, buffer)
+        self.structure.partial_serialize(&mut self.cursor, buffer)
     }
 
     pub fn peek_serialize(&self, buffer: &mut SerializationBuffer) -> SerializationResult {
         let mut cursor = self.cursor;
-        self.structure.serialize(&mut cursor, buffer)
+        self.structure.partial_serialize(&mut cursor, buffer)
     }
 
     pub fn crc(&mut self, data_type_signature: u64) -> u16 {
@@ -248,44 +248,44 @@ mod tests {
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut data);
 
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(uint2.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
+        assert_eq!(uint2.partial_serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(buffer.data, [0b01000000, 0, 0, 0]);
 
         buffer.stop_bit_index = 0;
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(uint8.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
+        assert_eq!(uint8.partial_serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(buffer.data, [128, 0, 0, 0]);
 
         buffer.stop_bit_index = 0;
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(uint16.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
+        assert_eq!(uint16.partial_serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(buffer.data, [1, 1, 0, 0]);
 
-        uint2.serialize(&mut Cursor::new(), &mut buffer);
+        uint2.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [1, 1, 0b01000000, 0]);
 
-        uint8.serialize(&mut Cursor::new(), &mut buffer);
+        uint8.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [1, 1, 0b01000000, 0b10000000]);
 
         buffer.stop_bit_index = 0;
-        int16.serialize(&mut Cursor::new(), &mut buffer);
+        int16.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data[0..2], [0xff, 0xff]);
 
         buffer.stop_bit_index = 0;
         buffer.data[0] = 0;
-        int7.serialize(&mut Cursor::new(), &mut buffer);
+        int7.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data[0], (-64i8 as u8) << 1);
 
         buffer.stop_bit_index = 0;
-        float16.serialize(&mut Cursor::new(), &mut buffer);
+        float16.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data[0..2], [f16::from_f32(3.141592).as_bits() as u8, (f16::from_f32(3.141592).as_bits() >> 8) as u8]);
 
         buffer.stop_bit_index = 0;
-        float32.serialize(&mut Cursor::new(), &mut buffer);
+        float32.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0x00, 0x00, 0x80, 0x3f]);
 
         buffer.stop_bit_index = 0;
-        float64.serialize(&mut Cursor::new(), &mut buffer);
+        float64.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0x69, 0x57, 0x14, 0x8b]);
 
 
@@ -301,17 +301,17 @@ mod tests {
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut data);
 
         let mut cursor = Cursor{field: 0, bit: 0};
-        assert_eq!(a1.serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
+        assert_eq!(a1.partial_serialize(&mut cursor, &mut buffer), SerializationResult::Finished);
         assert_eq!(cursor.field, 5);
         assert_eq!(cursor.bit, 0);
         assert_eq!(buffer.data, [0b10001001, 0, 0, 0]);
 
         buffer.stop_bit_index = 0;
-        a2.serialize(&mut Cursor::new(), &mut buffer);
+        a2.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0b11001001, 0b00001000, 0, 0]);
 
         buffer.stop_bit_index = 0;
-        a3.serialize(&mut Cursor::new(), &mut buffer);
+        a3.partial_serialize(&mut Cursor::new(), &mut buffer);
         assert_eq!(buffer.data, [0b10000001, 0b00000010, 0b00000100, 0b00010000]);
 
     }
@@ -324,21 +324,21 @@ mod tests {
         let mut buffer = SerializationBuffer::with_empty_buffer(&mut data);
 
         let mut cursor = Cursor{field: 1, bit: 0};
-        a.serialize(&mut cursor, &mut buffer);
+        a.partial_serialize(&mut cursor, &mut buffer);
         assert_eq!(cursor.field, 2);
         assert_eq!(cursor.bit, 1);
         assert_eq!(buffer.data, [0b00000011]);
         
         buffer.stop_bit_index = 0;
-        a.serialize(&mut cursor, &mut buffer);
+        a.partial_serialize(&mut cursor, &mut buffer);
         assert_eq!(buffer.data, [0b00000001]);
 
         buffer.stop_bit_index = 0;
-        a.serialize(&mut cursor, &mut buffer);
+        a.partial_serialize(&mut cursor, &mut buffer);
         assert_eq!(buffer.data, [0b00000001]);
 
         buffer.stop_bit_index = 0;
-        a.serialize(&mut cursor, &mut buffer);
+        a.partial_serialize(&mut cursor, &mut buffer);
         assert_eq!(buffer.data[0].get_bits((8 - buffer.stop_bit_index as u8)..8), 0b00000000);
 
     }

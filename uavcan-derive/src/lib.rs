@@ -140,7 +140,7 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
                 
                 serialize_body.append(quote!{if cursor.field >= (#field_index) && cursor.field < (#field_index) + #field_length {
                     cursor.field -= (#field_index);
-                    if ::#crate_name::Serializable::serialize(&self.#field_ident, cursor, buffer) == ::#crate_name::SerializationResult::Finished {
+                    if ::#crate_name::Serializable::partial_serialize(&self.#field_ident, cursor, buffer) == ::#crate_name::SerializationResult::Finished {
                         cursor.field += (#field_index);
                         cursor.bit = 0;
                     } else {
@@ -151,7 +151,7 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
 
                 deserialize_body.append(quote!{if cursor.field >= (#field_index) && cursor.field < (#field_index) + #field_length {
                     cursor.field -= (#field_index);
-                    if ::#crate_name::Serializable::deserialize(&mut self.#field_ident, cursor, buffer) == ::#crate_name::DeserializationResult::Finished {
+                    if ::#crate_name::Serializable::partial_deserialize(&mut self.#field_ident, cursor, buffer) == ::#crate_name::DeserializationResult::Finished {
                         cursor.field += (#field_index);
                         cursor.bit = 0;
                     } else {
@@ -193,7 +193,7 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
             const FLATTENED_FIELDS_NUMBER: usize = #flattened_fields;
             #[allow(unused_comparisons)]
             #[allow(unused_variables)]
-            fn serialize(&self, cursor: &mut ::#crate_name::Cursor, buffer: &mut ::#crate_name::SerializationBuffer) -> ::#crate_name::SerializationResult {
+            fn partial_serialize(&self, cursor: &mut ::#crate_name::Cursor, buffer: &mut ::#crate_name::SerializationBuffer) -> ::#crate_name::SerializationResult {
                 assert!(cursor.field < Self::FLATTENED_FIELDS_NUMBER);
                 while cursor.field != Self::FLATTENED_FIELDS_NUMBER{
                     assert!(cursor.field < Self::FLATTENED_FIELDS_NUMBER);
@@ -204,7 +204,7 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
 
             #[allow(unused_comparisons)]
             #[allow(unused_variables)]
-            fn deserialize(&mut self, cursor: &mut ::#crate_name::Cursor, buffer: &mut ::#crate_name::DeserializationBuffer) -> ::#crate_name::DeserializationResult {
+            fn partial_deserialize(&mut self, cursor: &mut ::#crate_name::Cursor, buffer: &mut ::#crate_name::DeserializationBuffer) -> ::#crate_name::DeserializationResult {
                 assert!(cursor.field < Self::FLATTENED_FIELDS_NUMBER);
                 while cursor.field != Self::FLATTENED_FIELDS_NUMBER{
                     assert!(cursor.field < Self::FLATTENED_FIELDS_NUMBER);
