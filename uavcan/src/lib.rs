@@ -94,45 +94,6 @@ pub use deserializer::{
 /// The serializer will then iterate over all fields and bits
 pub trait Serializable {
     
-    /// The minimum bit length an uavcan type can have
-    ///
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #[macro_use]
-    /// # extern crate uavcan;
-    /// # use uavcan::Struct;
-    /// # use uavcan::types::*;
-    /// # use uavcan::Serializable;
-    ///
-    /// # fn main() {
-    /// // The primitive types have a fixed amount of bits
-    /// assert_eq!(u2::BIT_LENGTH_MIN, 2);
-    ///
-    /// // The static arrays also have a fixed amount of bits
-    /// assert_eq!(<[i62; 4] as Serializable>::BIT_LENGTH_MIN, 62*4);
-    /// 
-    /// // The dynamic arrays have their length coding included even though they can be optimized in some cases
-    /// assert_eq!(Dynamic::<[void11; 3]>::BIT_LENGTH_MIN, 2);
-    ///
-    /// // Structs have the sum of all fields `MIN_BIT_LENGTH` as their `MIN_BIT_LENGTH`.
-    /// #[derive(UavcanStruct)]
-    /// struct Foo {
-    ///     v1: u2,
-    ///     v2: [i62; 4],
-    ///     v3: Dynamic<[void11; 3]>,
-    /// }
-    ///
-    /// assert_eq!(Foo::BIT_LENGTH_MIN, 2 + 62*4 + 2);
-    ///
-    /// // Enums have the minimum of all variants `MIN_BIT_LENGTH` as their `MIN_BIT_LENGTH`.
-    /// // (But this is not implemented yet)
-    ///
-    /// # }
-    /// ```
-    const BIT_LENGTH_MIN: usize;
-    
     /// Number of primitive fields after flattening of data type.
     ///
     /// Flattening of a struct consists of replacing all structs with its fields.
