@@ -101,12 +101,12 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
                 
                 match classify_type(field_type) {
                     UavcanType::PrimitiveType => flattened_fields.append(quote!{ + 1}),
-                    UavcanType::StaticArray => flattened_fields.append(quote!{ + <#field_type as ::#crate_name::Serializable>::FLATTENED_FIELDS_NUMBER}),
+                    UavcanType::StaticArray => flattened_fields.append(quote!{ + <#field_type as ::#crate_name::SerializableStatic>::FLATTENED_FIELDS_NUMBER}),
                     UavcanType::DynamicArray => {
                         let array_type = array_from_dynamic(field_type);
-                        flattened_fields.append(quote!{ + <::#crate_name::types::Dynamic<#array_type> as ::#crate_name::Serializable>::FLATTENED_FIELDS_NUMBER});
+                        flattened_fields.append(quote!{ + <::#crate_name::types::Dynamic<#array_type> as ::#crate_name::SerializableStatic>::FLATTENED_FIELDS_NUMBER});
                     },
-                    UavcanType::Struct => flattened_fields.append(quote!{ + <#field_type as ::#crate_name::Serializable>::FLATTENED_FIELDS_NUMBER}),
+                    UavcanType::Struct => flattened_fields.append(quote!{ + <#field_type as ::#crate_name::SerializableStatic>::FLATTENED_FIELDS_NUMBER}),
                 }
             
 
@@ -115,12 +115,12 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
                 
                 let field_length = match classify_type(field_type) {
                     UavcanType::PrimitiveType => quote!(1),
-                    UavcanType::StaticArray => quote!(<#field_type as ::#crate_name::Serializable>::FLATTENED_FIELDS_NUMBER),
+                    UavcanType::StaticArray => quote!(<#field_type as ::#crate_name::SerializableStatic>::FLATTENED_FIELDS_NUMBER),
                     UavcanType::DynamicArray => {
                         let array_type = array_from_dynamic(field_type);
-                        quote!{<::#crate_name::types::Dynamic<#array_type> as ::#crate_name::Serializable>::FLATTENED_FIELDS_NUMBER}
+                        quote!{<::#crate_name::types::Dynamic<#array_type> as ::#crate_name::SerializableStatic>::FLATTENED_FIELDS_NUMBER}
                     },
-                    UavcanType::Struct => quote!{<#field_type as ::#crate_name::Serializable>::FLATTENED_FIELDS_NUMBER},
+                    UavcanType::Struct => quote!{<#field_type as ::#crate_name::SerializableStatic>::FLATTENED_FIELDS_NUMBER},
                 };
                 
                 serialize_body.append(quote!{if cursor.field >= (#field_index) && cursor.field < (#field_index) + #field_length {
@@ -172,8 +172,11 @@ fn impl_uavcan_struct(ast: &syn::DeriveInput) -> quote::Tokens {
             const DATA_TYPE_SIGNATURE: u64 = #data_type_signature;
         }
 
-        impl ::#crate_name::Serializable for #name {
+        impl ::#crate_name::SerializableStatic for #name {
             const FLATTENED_FIELDS_NUMBER: usize = #flattened_fields;
+        }
+
+        impl ::#crate_name::Serializable for #name {
             #[allow(unused_comparisons)]
             #[allow(unused_variables)]
             fn partial_serialize(&self, cursor: &mut ::#crate_name::Cursor, buffer: &mut ::#crate_name::SerializationBuffer) -> ::#crate_name::SerializationResult {

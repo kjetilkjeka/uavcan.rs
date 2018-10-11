@@ -17,6 +17,8 @@ use lib::core::ops::{
 use bit_field::BitField;
 
 use {
+    Serializable,
+    SerializableStatic,
     Cursor,
 };
 
@@ -63,9 +65,11 @@ macro_rules! impl_array{
     {($size:expr, $length_bits:expr)} => {
 
         // first implement static arrays
-        impl<T: ::Serializable> ::Serializable for [T; $size] {
+        impl<T: SerializableStatic> SerializableStatic for [T; $size] {
             const FLATTENED_FIELDS_NUMBER: usize = $size * T::FLATTENED_FIELDS_NUMBER;
-            
+        }
+
+        impl<T: SerializableStatic> Serializable for [T; $size] {
             fn partial_serialize(&self, cursor: &mut Cursor, buffer: &mut SerializationBuffer) -> SerializationResult {
                 while cursor.field < Self::FLATTENED_FIELDS_NUMBER {
                     let element = cursor.field  / T::FLATTENED_FIELDS_NUMBER;
@@ -186,9 +190,11 @@ macro_rules! impl_array{
 
         }
 
-        impl<T: ::Serializable> ::Serializable for Dynamic<[T; $size]> {
+        impl<T: SerializableStatic> SerializableStatic for Dynamic<[T; $size]> {
             const FLATTENED_FIELDS_NUMBER: usize = $size * T::FLATTENED_FIELDS_NUMBER + 1;
-            
+        }
+
+        impl<T: SerializableStatic> Serializable for Dynamic<[T; $size]> {
             fn partial_serialize(&self, cursor: &mut Cursor, buffer: &mut SerializationBuffer) -> SerializationResult {
 
                 let buffer_bits_remaining = buffer.bits_remaining();
@@ -456,9 +462,11 @@ impl_array!([(250, 8), (251, 8), (252, 8), (253, 8), (254, 8), (255, 8), (256, 9
 
 macro_rules! impl_serializeable {
     {$type:ident, $bits:expr} => {
-        impl ::Serializable for $type {
+        impl SerializableStatic for $type {
             const FLATTENED_FIELDS_NUMBER: usize = 1;
-            
+        }
+
+        impl Serializable for $type {
             fn partial_serialize(&self, cursor: &mut Cursor, buffer: &mut SerializationBuffer) -> SerializationResult {
                 assert_eq!(cursor.field, 0);
                 let type_bits_remaining = $bits - cursor.bit;
